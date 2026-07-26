@@ -1,39 +1,118 @@
-# GovRisk AI — Control of Corruption Prediction
+# Control of Corruption Predictor
 
-## Mission & Problem
+## Mission
 
-Investors, donors, and policy analysts need a fast way to gauge a country's institutional risk, but full governance audits are slow and expert-dependent.
-GovRisk AI predicts the World Bank's **Control of Corruption** estimate (`cce`) for a country-year directly from its other Worldwide Governance Indicators.
-This turns a slow expert review into a near-instant, data-driven risk signal.
+Corruption is one of the clearest threats to a country's institutional health — it weakens public trust, discourages investment, and undermines the rule of law that everything else depends on. This project's mission is to estimate a country's **Control of Corruption** score (`cce`, roughly −2.5 to +2.5; higher = stronger control of corruption) from five other governance dimensions — Voice & Accountability, Political Stability, Government Effectiveness, Regulatory Quality, and Rule of Law — across **212 countries and territories, 1996–2021**.
+
+This is country-level regression, not a fraud-detection or individual-risk tool: it identifies which governance dimensions move together with strong (or weak) corruption control, and estimates where a country's institutional profile places it, to support comparative governance analysis and policy prioritization.
 
 ## Dataset
 
-[World Bank Worldwide Governance Indicators (WGI)](https://www.kaggle.com/datasets/cvengr/government-corruption-data-of-180-countries)
-— 180 countries/territories, 1996–2021 (annual from 2002 onward), ~4,900 rows after cleaning, 6
-governance dimensions each reported as an estimate + standard error. Full column dictionary and
-methodology notes are in the notebook header and
-[`wgidataset_readme.pdf`](<summative/linear_regression/Corruption Indicator Data of 180 Governments/wgidataset_readme.pdf>).
+- **4,922 raw country-year observations → 4,876 after cleaning**, across 212 countries, 1996–2021, using 10 governance-indicator features
+- **4 regression models compared:** OLS, SGD (gradient descent), Decision Tree, Random Forest
+- **Random Forest selected** — Test R² = **95.63%**, Test RMSE = **0.203**, Test MAE = **0.144**
+- **Rule of Law and Government Effectiveness** carry by far the most predictive weight — confirmed independently by correlation analysis, OLS coefficients, and Random Forest feature importances
+- Flutter mobile app built as the prediction front-end; a FastAPI backend is the planned next step (see [API](#api))
 
-### Visualizations
+## Data Source
 
-<table>
-<tr><td>
+The dataset is the **World Bank Worldwide Governance Indicators (WGI)**, obtained as a pre-assembled snapshot via Kaggle rather than pulled from the live API directly in this pipeline.
 
-![Correlation heatmap of WGI governance indicators against cce](summative/linear_regression/images/correlation_heatmap.png)
+| Source | Link |
+|---|---|
+| Kaggle dataset used in this project: 1996, 1998, 2000, then annually 2002–2021 | https://www.kaggle.com/datasets/cvengr/government-corruption-data-of-180-countries | 
+| Official WGI data & documentation (primary source): Annually updated; the live WGI series has since been extended through 2024 | https://www.govindicators.org and https://www.worldbank.org/en/publication/worldwide-governance-indicators | 
+| World Bank DataBank interface: Interactive query/download tool for the same underlying data | https://databank.worldbank.org/source/worldwide-governance-indicators | 
 
-</td></tr>
-</table>
+**Note on recency:** the Kaggle snapshot used here ends in 2021. The World Bank's live WGI release now covers through 2024 and underwent a **2025 methodology revision** (a stricter source-screening protocol and a new absolute 0–100 scale alongside the original standardized estimate). A future update of this project could re-pull directly from `www.govindicators.org` or the World Bank API to bring the training data current — see [Planned Enhancements](#planned-enhancements).
 
-`rle` (Rule of Law), `gee` (Government Effectiveness), and `rqe` (Regulatory Quality) all correlate
-with `cce` at **r ≈ 0.87–0.94** — the strongest signal in the dataset, and the reason all three
-survive as top features in every model below despite moderate multicollinearity (VIF ≈ 9–13).
+### WGI columns used
 
-![Distribution of cce and scatter of rle vs cce](summative/linear_regression/images/feature_distributions.png)
+The WGI publishes six governance dimensions, each with six sub-fields (estimate, standard error, number of sources, percentile rank, and 90% confidence-interval lower/upper bounds). This project uses the **estimate** and **standard error** sub-fields from five dimensions as features, and the **estimate** sub-field of the sixth as the target:
 
-`cce` is roughly normal and centered near 0 (the WGI scale runs about −2.5 to +2.5), and its
-relationship with `rle` is visibly linear with mild heteroscedasticity at the extremes — evidence
-that a linear model is a reasonable fit, while a tree-based model can still pick up the edge-case
-curvature.
+| Column | Feature name | Description |
+|---|---|---|
+| `vae` | Voice & Accountability — estimate | Citizens' ability to participate in selecting government, freedom of expression/association, free media |
+| `vas` | Voice & Accountability — standard error | Statistical uncertainty of `vae` |
+| `pve` | Political Stability — estimate | Likelihood of political instability or politically-motivated violence (incl. terrorism) |
+| `pvs` | Political Stability — standard error | Statistical uncertainty of `pve` |
+| `gee` | Government Effectiveness — estimate | Quality of public services, civil service, policy formulation/implementation |
+| `ges` | Government Effectiveness — standard error | Statistical uncertainty of `gee` |
+| `rqe` | Regulatory Quality — estimate | Government's ability to formulate/implement sound private-sector policy |
+| `rqs` | Regulatory Quality — standard error | Statistical uncertainty of `rqe` |
+| `rle` | Rule of Law — estimate | Confidence in contract enforcement, property rights, police, courts |
+| `rls` | Rule of Law — standard error | Statistical uncertainty of `rle` |
+| `cce` | **Control of Corruption — estimate (target)** | Extent to which public power is exercised for private gain |
+
+All other WGI sub-fields (`*n` number of sources, `*r` percentile rank, `*l`/`*u` confidence bounds, and every `cc*` field other than `cce` itself) were excluded — the rank/CI columns are direct transformations of their own estimate column, and including the other `cc*` fields alongside the `cce` target would be data leakage.
+
+## How the Data Was Cleaned and Prepared
+
+1. **Load** — the Kaggle CSV is read directly as a single wide table (`code`, `countryname`, `year`, plus all 36 WGI sub-field columns); unlike a two-source merge, no join was required here.
+2. **Missing-value audit** — every governance column had a real, non-trivial gap: `gee`/`ges` and the rest of the Government Effectiveness family were ~4.94% missing, `rqe`/`rqs` ~4.90%, `cce` ~4.45%, `pve`/`pvs` ~3.43%, and `rle`/`rls` ~2.62% — consistent with the WGI's own irregular pre-2002 reporting schedule (only 1996, 1998, and 2000 were published before annual reporting began).
+3. **Fill-strategy comparison** — on `rls` (Rule of Law standard error, ~2.62% missing), a global mean fill was tested against **within-country linear interpolation**. The global mean fill compressed `rls`'s natural variance and pulled its correlation with `cce` slightly toward zero; interpolation preserved both far better — the same conclusion reached when comparing these two strategies on health/economic panel data elsewhere, and the reason interpolation was adopted for every column here.
+4. **Missing-by-country check** — **Monaco and San Marino had 100% missing `cce`, `gee`, and `rqe` across every one of the 23 years on record.** The World Bank has never published these estimates for either micro-state, so interpolation had nothing to work from; both countries were excluded, leaving 212 countries.
+5. **Apply interpolation** — within-country linear interpolation was applied to all 10 feature columns and the target across the remaining 212 countries.
+6. **Multicollinearity check (VIF)** — before finalizing the feature set:
+
+   | Feature | VIF |
+   |---|---|
+   | `gee` | 11.48 |
+   | `rle` | 11.21 |
+   | `rqe` | 9.40 |
+   | `rls` | 7.07 |
+   | `ges` | 4.33 |
+   | `rqs` | 4.12 |
+   | `vas` | 3.55 |
+   | `vae` | 3.39 |
+   | `pve` | 2.97 |
+   | `pvs` | 2.93 |
+
+   `gee`, `rle`, and `rqe` show moderate overlap (governance dimensions genuinely move together in real countries), but none reach the severe multicollinearity range, and VIF thresholds like "10" are themselves a debated rule of thumb rather than a hard cutoff (O'Brien, 2007) — so all 10 requested predictors were kept.
+7. **Drop identifiers** — `code` and `countryname` (row identifiers, no governance signal) were dropped; `year` and the remaining unused WGI sub-fields were retained in the cleaned file for reference but excluded from the model inputs.
+8. **Output** — 4,876 cleaned rows across 37 columns, split 80/20 into 3,900 train / 976 test rows.
+
+## Model Background & Performance
+
+Four regression approaches were trained and compared: Ordinary Least Squares, SGD (manual gradient-descent loop with an explicit train/test loss curve tracked epoch-by-epoch), a depth-tuned Decision Tree, and a Random Forest.
+
+| | OLS | SGD | Decision Tree | Random Forest |
+|---|---|---|---|---|
+| Train RMSE | 0.326 | 0.327 | 0.073 | 0.076 |
+| Test RMSE | 0.319 | 0.319 | 0.261 | **0.203** |
+| Train MAE | 0.263 | 0.263 | 0.034 | 0.054 |
+| Test MAE | 0.254 | 0.254 | 0.175 | **0.144** |
+| Train R² | 89.17% | 89.17% | 99.46% | 99.41% |
+| Test R² | 89.24% | 89.26% | 92.78% | **95.63%** |
+
+**Random Forest was selected** — it posted the best score on every test-set metric (RMSE, MAE, and R²), with no trade-off to weigh. OLS and SGD converge to essentially the same linear solution (as expected — SGD is just an iterative way of solving the same regression problem OLS solves in closed form), capturing ~89% of the variance. Random Forest's edge over the single Decision Tree comes from averaging across many trees, which tempers the Decision Tree's overfitting (note its much larger Train/Test R² gap) while still capturing the slight non-linear curvature in how governance dimensions relate to each other.
+
+### Which features carry the most weight
+
+Three independent methods agree on the same answer:
+
+| Method | Top feature | 2nd | 3rd |
+|---|---|---|---|
+| Correlation with `cce` | `rle` (r = 0.936) | `gee` (r = 0.919) | `rqe` (r = 0.867) |
+| OLS standardized coefficient | `rle` (0.527) | `gee` (0.431) | `rqe` (−0.092) |
+| Random Forest feature importance | `rle` (0.794) | `gee` (0.117) | `vae` (0.022) |
+
+**Rule of Law and Government Effectiveness dominate the prediction** in every method tried; the five standard-error columns (`vas`, `pvs`, `ges`, `rqs`, `rls`) consistently contribute the least, since they measure the *precision* of an estimate rather than governance quality itself.
+
+## Evaluation Scope
+
+The model is designed to estimate a country's Control of Corruption level from its *current* governance profile in a given year — not to forecast a country's future corruption trajectory. Accordingly, an 80/20 **random** train-test split was used across country-year observations rather than a temporal split. This evaluates the model's ability to generalize to unseen country-year combinations among the 212 countries studied, not its ability to forecast future years or generalize to a country it has never seen at all.
+
+
+### Recommended CORS configuration (once deployed)
+
+```
+allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"]  # add your web dev origin(s) if you build one
+allow_credentials=False
+allow_methods=["GET", "POST"]
+allow_headers=["Content-Type"]
+```
+Reasoning: methods limited to GET/POST since the API only reads status and predicts; credentials disabled since this is a stateless prediction API with no session/cookie auth; the Flutter mobile app is not subject to CORS at all, since CORS only restricts browser-based requests.
 
 ## Model Comparison
 
@@ -54,27 +133,29 @@ noise of each other, confirming gradient descent converged to essentially the sa
 closed-form solution; both are ~6 points of R² behind Random Forest because the `rle`/`cce`
 relationship has mild curvature a straight line can't capture.
 
+
 ## Repository Structure
 
 ```
-.
+corruption_prediction/
 ├── README.md
-├── pyproject.toml, uv.lock, .python-version   # uv-managed environment (repo root)
-├── requirements.txt                            # exported for pip-only platforms (Render)
-└── summative/
-    ├── linear_regression/
-    │   ├── wgi_corruption_linear_regression.ipynb
-    │   ├── model.pkl, scaler.pkl               # produced by the notebook
-    │   ├── wgi_corruption_{train,test}_data.csv
-    │   ├── images/                             # visualizations used above
-    │   └── Corruption Indicator Data of 180 Governments/   # raw dataset + readme
-    ├── api/
-    │   ├── main.py                             # FastAPI app, CORS middleware
-    │   ├── schema/                             # Pydantic request/response models
-    │   ├── router/                             # HTTP route handlers
-    │   ├── service/                            # model loading, prediction, retraining
-    │   └── data/incoming/                      # uploaded retrain CSVs (gitignored)
-    └── FlutterApp/                             # mobile app (see below)
+├── requirements.txt
+├── summative/
+│   ├── linear_regression/
+│   │   ├── wgi_corruption_regression_analysis.ipynb   # full notebook: EDA, cleaning, VIF, training, comparison
+│   │   ├── wgidataset.csv                             # raw Kaggle/WGI snapshot
+│   │   ├── wgi_corruption_train_data.csv               # the 80% train split used to fit every model
+│   │   ├── wgi_corruption_test_data.csv                # the 20% held-out test split
+│   │   └── model.pkl, scaler.pkl                       # saved best-performing model (Random Forest) + fitted scaler
+│   │
+│   ├── api/                      # PLANNED — FastAPI backend, not yet implemented
+│   │
+│   └── FlutterApp/          # the Flutter mobile app
+│       ├── lib/
+│       │   ├── main.dart         # app entry point + theme
+│       │   ├── screen.dart       # the single prediction screen (form, Predict/Clear, result panel)
+│       │   └── api_service.dart  # HTTP client — placeholder endpoint, update once the API is deployed
+│       └── pubspec.yaml
 ```
 
 ## Setup (uv)
@@ -147,6 +228,56 @@ flutter run          # pick a connected physical device or emulator when prompte
 (Grading requires the **mobile** app, not the Flutter web target — run on an Android/iOS
 device or emulator, e.g. `flutter run -d <device-id>` from `flutter devices`.)
 
-## Video Demo
 
-[YouTube demo (≤7 min)](TODO-add-youtube-link) — TODO: add the link once recorded.
+## Planned Enhancements
+
+- **Build and deploy the FastAPI backend** wrapping `model.pkl`/`scaler.pkl`, matching the request/response shape already expected by the Flutter app
+- **SHAP explanations** attached to each prediction, so a returned `cce` estimate comes with a per-feature contribution breakdown
+- **A retraining endpoint** to update the live model as new WGI releases become available, without a full redeploy
+- **Refresh the training data** directly from the live WGI/World Bank source to extend coverage from 2021 through the current release year
+- **A video walkthrough** of the notebook, app, and (once built) the API
+
+## Limitations
+
+- **Association, not causation** — the relationships the model learns are correlational. They do not establish that improving one governance dimension, such as Regulatory Quality, would causally improve Control of Corruption.
+- **Random split, not a test of unseen countries** — the 80/20 split evaluates generalization across country-year observations, not the model's ability to generalize to a country it has never seen at all.
+- **Interpolation introduces uncertainty** — values filled by within-country linear interpolation are estimates, not directly observed data points, and carry some uncertainty accordingly.
+- **Perception-based data** — the WGI itself is built from surveys and expert assessments, not objective administrative records; every `cce` value (and every predictor) already carries its own margin of error, which is exactly what the standard-error columns in this dataset represent.
+- **Dataset recency** — this project's snapshot ends in 2021; the live WGI series and its underlying methodology have since been updated (see [Data Source](#data-source)).
+- **Not yet deployed** — there is no live prediction API at the time of writing; the Flutter app is functional as a UI but cannot return real predictions until the backend exists.
+- **A decision-support and educational tool, not a policy verdict** — intended to help compare a country's institutional profile against governance patterns seen elsewhere, not to replace expert governance or anti-corruption analysis.
+
+## Sources
+
+### Data Sources
+- Kaggle snapshot used in this project: https://www.kaggle.com/datasets/cvengr/government-corruption-data-of-180-countries
+- World Bank Worldwide Governance Indicators (official, live source): https://www.govindicators.org
+- WGI documentation: https://www.worldbank.org/en/publication/worldwide-governance-indicators/documentation
+- WGI via World Bank DataBank: https://databank.worldbank.org/source/worldwide-governance-indicators
+
+### References
+- Kaufmann, D., Kraay, A., & Mastruzzi, M. (2010). *The Worldwide Governance Indicators: Methodology and Analytical Issues.* World Bank Policy Research Working Paper No. 5430. https://ssrn.com/abstract=1682130 — the foundational methodology this entire dataset is built on.
+- Kaufmann, D., & Kraay, A. (2024). *The Worldwide Governance Indicators: Methodology and 2024 Update.* World Bank Policy Research Working Paper No. 10952. https://openknowledge.worldbank.org/bitstreams/64afd13e-e4e5-409e-9ef1-958b0b723f75/download — the most recent update to the methodology summarized above.
+- O'Brien, R. M. (2007). *A Caution Regarding Rules of Thumb for Variance Inflation Factors.* Quality & Quantity, 41, 673–690. https://doi.org/10.1007/s11135-006-9018-6 — basis for treating VIF ≈ 9–13 as moderate rather than automatically disqualifying, since commonly-cited thresholds like "10" are a convention rather than a hard statistical cutoff.
+- Noor, N. M., Abdullah, M. M. A. B., Yahaya, A. S., & Ramli, N. A. (2014). *Comparison of Linear Interpolation Method and Mean Method to Replace the Missing Values in Environmental Data Set.* Materials Science Forum, 803, 278–281. https://www.researchgate.net/publication/271978892 — direct precedent for comparing linear interpolation against a global mean fill, the same comparison used in this project's cleaning step.
+
+### Documentation
+- scikit-learn: https://scikit-learn.org/stable/
+- statsmodels (VIF): https://www.statsmodels.org/stable/index.html
+- Flutter: https://docs.flutter.dev/
+- FastAPI (planned backend): https://fastapi.tiangolo.com/
+
+## Author
+
+Maurice Nshimyumukiza
+
+Email: m.nshimyumu@alustudent.com
+
+GitHub: N.Maurice
+
+## Paths and Links
+
+- Notebook: `summative/linear_regression/wgi_corruption_regression_analysis.ipynb`
+- Mobile app: `summative/FlutterApp/`
+- Backend API: `summative/api/`
+- Video demo: 

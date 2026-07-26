@@ -1,19 +1,10 @@
-"""Pydantic request/response models for the Control of Corruption prediction endpoint."""
-
 from pydantic import BaseModel, Field
 
-# WGI feature scale: "estimate" columns run roughly -2.5..2.5 on the official
-# scale; the fitted training data ranges -3.31..2.43, so bounds are widened to
-# -3.5..3.5 to stay realistic without being so loose they admit garbage input.
 _ESTIMATE_BOUNDS = {"ge": -3.5, "le": 3.5}
-# "Standard error" columns are always non-negative; observed training data
-# ranges 0.10..1.08, widened to 0.0..1.5 for headroom.
 _STD_ERROR_BOUNDS = {"ge": 0.0, "le": 1.5}
 
 
 class CorruptionPredictionRequest(BaseModel):
-    """The 10 WGI governance features the model was trained on (see feature_columns in the notebook)."""
-
     vae: float = Field(..., **_ESTIMATE_BOUNDS, description="Voice and Accountability - Estimate")
     vas: float = Field(..., **_STD_ERROR_BOUNDS, description="Voice and Accountability - Standard Error")
     pve: float = Field(

@@ -1,8 +1,3 @@
-"""Background retraining job: merges newly uploaded rows with the existing
-training data, refits scaler + Random Forest with the notebook's
-hyperparameters, and atomically replaces model.pkl / scaler.pkl.
-"""
-
 from pathlib import Path
 from threading import Lock
 from typing import Dict
@@ -81,7 +76,7 @@ def run_retrain_job(job_id: str, new_data_path: Path) -> None:
         model_service.reload()
 
         _set_status(job_id, status="completed", detail="Retraining finished successfully", metrics=metrics)
-    except Exception as exc:  # surfaced via GET /retrain/{job_id}, not raised in the background thread
+    except Exception as exc:
         _set_status(job_id, status="failed", detail=f"Retraining failed: {exc}")
 
 

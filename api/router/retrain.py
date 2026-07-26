@@ -17,8 +17,6 @@ INCOMING_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("", response_model=RetrainAcceptedResponse, status_code=202)
 async def trigger_retrain(background_tasks: BackgroundTasks, file: UploadFile = File(...)) -> RetrainAcceptedResponse:
-    """Accepts a CSV of new labelled rows (feature columns + 'cce') and retrains
-    the model in the background. Poll GET /retrain/{job_id} for progress."""
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv uploads are supported")
 

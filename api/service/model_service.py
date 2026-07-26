@@ -1,10 +1,3 @@
-"""Loads the trained model/scaler and runs predictions.
-
-Reads model.pkl and scaler.pkl from the repository root (produced by
-wgi_corruption_linear_regression.ipynb) — those files are not duplicated here
-so the API always serves whatever the notebook most recently saved.
-"""
-
 from pathlib import Path
 from threading import Lock
 from typing import List
@@ -18,8 +11,6 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 MODEL_PATH = ROOT_DIR / "model.pkl"
 SCALER_PATH = ROOT_DIR / "scaler.pkl"
 
-# Order matters: must match the column order the scaler/model were fit on
-# (feature_columns in the notebook, confirmed via model.feature_names_in_).
 FEATURE_COLUMNS: List[str] = ["vae", "vas", "pve", "pvs", "gee", "ges", "rqe", "rqs", "rle", "rls"]
 
 MODEL_NAME = "Random Forest Regressor"
@@ -27,7 +18,6 @@ MODEL_NAME = "Random Forest Regressor"
 _lock = Lock()
 _model = None
 _scaler = None
-
 
 class ModelNotLoadedError(RuntimeError):
     pass
@@ -45,7 +35,6 @@ def _load() -> None:
 
 
 def get_model_and_scaler():
-    """Lazily loads (and caches) the model/scaler, reloading if the files changed on disk."""
     with _lock:
         if _model is None or _scaler is None:
             _load()
@@ -53,7 +42,6 @@ def get_model_and_scaler():
 
 
 def reload() -> None:
-    """Forces a reload from disk — called after a retrain job replaces the artifacts."""
     with _lock:
         _load()
 

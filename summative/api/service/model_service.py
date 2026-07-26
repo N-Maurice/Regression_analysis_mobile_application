@@ -8,8 +8,9 @@ import pandas as pd
 from schema.prediction import CorruptionPredictionRequest
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-MODEL_PATH = ROOT_DIR / "model.pkl"
-SCALER_PATH = ROOT_DIR / "scaler.pkl"
+DATA_DIR = ROOT_DIR / "linear_regression"
+MODEL_PATH = DATA_DIR / "model.pkl"
+SCALER_PATH = DATA_DIR / "scaler.pkl"
 
 FEATURE_COLUMNS: List[str] = ["vae", "vas", "pve", "pvs", "gee", "ges", "rqe", "rqs", "rle", "rls"]
 

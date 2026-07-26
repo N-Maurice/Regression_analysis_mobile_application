@@ -9,15 +9,15 @@ from sklearn.metrics import r2_score, root_mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from service.model_service import FEATURE_COLUMNS, MODEL_PATH, ROOT_DIR, SCALER_PATH
+from service.model_service import DATA_DIR, FEATURE_COLUMNS, MODEL_PATH, SCALER_PATH
 from service import model_service
 
 TARGET_COLUMN = "cce"
 RANDOM_STATE = 42
 N_ESTIMATORS = 200
 
-TRAIN_DATA_PATH = ROOT_DIR / "wgi_corruption_train_data.csv"
-TEST_DATA_PATH = ROOT_DIR / "wgi_corruption_test_data.csv"
+TRAIN_DATA_PATH = DATA_DIR / "wgi_corruption_train_data.csv"
+TEST_DATA_PATH = DATA_DIR / "wgi_corruption_test_data.csv"
 
 REQUIRED_COLUMNS = FEATURE_COLUMNS + [TARGET_COLUMN]
 

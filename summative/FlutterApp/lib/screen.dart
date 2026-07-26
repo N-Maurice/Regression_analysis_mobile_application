@@ -4,10 +4,6 @@ import 'api_service.dart';
 
 enum _ResultState { idle, loading, success, error }
 
-/// The single screen of the app: a form for the 10 WGI governance
-/// indicators, a Predict / Clear action row, and a result panel that shows
-/// either the predicted `cce` (Control of Corruption — Estimate) score or
-/// a validation / network error message.
 class PredictionScreen extends StatefulWidget {
   const PredictionScreen({super.key});
 
@@ -22,10 +18,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
   final _formKey = GlobalKey<FormState>();
 
-  // ---- The 10 real model predictors, in the same order as the mockup ----
-  // Estimates first (vae, pve, gee, rqe, rle), then standard errors
-  // (vas, pvs, ges, rqs, rls). `cce` is NOT an input — it is the value the
-  // model predicts and is shown in the result panel below.
   late final Map<String, TextEditingController> _controllers = {
     'vae': TextEditingController(),
     'pve': TextEditingController(),
@@ -43,9 +35,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
   double? _predictedValue;
   String? _errorMessage;
 
-  // Field metadata: label, tooltip, and value bounds.
-  // Estimate columns run roughly -2.5 to 2.5; standard errors are always
-  // positive and rarely exceed ~1.5 in the real WGI data.
   static const _estimateFields = [
     _FieldSpec(
       key: 'vae',
@@ -272,9 +261,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Header
-  // ---------------------------------------------------------------------
   Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,9 +283,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Institutional Indicators card (the form)
-  // ---------------------------------------------------------------------
   Widget _buildIndicatorsCard() {
     return _Card(
       child: Form(
@@ -344,8 +327,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
                 Expanded(
                   flex: 3,
                   child: ElevatedButton.icon(
-                    onPressed:
-                        _state == _ResultState.loading ? null : _onPredictPressed,
+                    onPressed: _state == _ResultState.loading
+                        ? null
+                        : _onPredictPressed,
                     icon: _state == _ResultState.loading
                         ? const SizedBox(
                             width: 16,
@@ -356,8 +340,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
                             ),
                           )
                         : const Icon(Icons.insights_rounded, size: 20),
-                    label: Text(
-                        _state == _ResultState.loading ? 'Predicting...' : 'Predict'),
+                    label: Text(_state == _ResultState.loading
+                        ? 'Predicting...'
+                        : 'Predict'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -385,21 +370,23 @@ class _PredictionScreenState extends State<PredictionScreen> {
           children: [
             Text(
               spec.label,
-              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+              style:
+                  const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
             ),
             const SizedBox(width: 6),
             Tooltip(
               message: spec.tooltip,
               triggerMode: TooltipTriggerMode.tap,
-              child: Icon(Icons.info_outline, size: 15, color: Colors.grey.shade500),
+              child: Icon(Icons.info_outline,
+                  size: 15, color: Colors.grey.shade500),
             ),
           ],
         ),
         const SizedBox(height: 8),
         TextFormField(
           controller: _controllers[spec.key],
-          keyboardType:
-              const TextInputType.numberWithOptions(decimal: true, signed: true),
+          keyboardType: const TextInputType.numberWithOptions(
+              decimal: true, signed: true),
           validator: (_) => _validate(spec),
           decoration: InputDecoration(
             hintText: 'e.g. ${spec.min < 0 ? '0.84' : '0.12'}',
@@ -409,9 +396,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Result panel — idle placeholder / loading / success / error
-  // ---------------------------------------------------------------------
   Widget _buildResultPanel() {
     switch (_state) {
       case _ResultState.idle:
@@ -427,7 +411,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
   Widget _buildIdlePanel() {
     return _DashedBorderBox(
-      color: primaryRed.withOpacity(0.35),
+      color: primaryRed.withValues(alpha: 0.35),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
         child: Column(
@@ -436,11 +420,11 @@ class _PredictionScreenState extends State<PredictionScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: primaryRed.withOpacity(0.08),
+                color: primaryRed.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.bar_chart_rounded,
-                  color: primaryRed.withOpacity(0.7), size: 26),
+                  color: primaryRed.withValues(alpha: 0.7), size: 26),
             ),
             const SizedBox(height: 18),
             const Text(
@@ -452,7 +436,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
               "Enter jurisdictional indicators above and click 'Predict' to "
               'generate an AI-powered corruption risk estimate.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13.5, color: Colors.grey.shade600, height: 1.4),
+              style: TextStyle(
+                  fontSize: 13.5, color: Colors.grey.shade600, height: 1.4),
             ),
           ],
         ),
@@ -482,7 +467,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
     final value = _predictedValue!;
     final risk = _riskLabelFor(value);
     return _Card(
-      border: risk.color.withOpacity(0.35),
+      border: risk.color.withValues(alpha: 0.35),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -521,7 +506,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
             decoration: BoxDecoration(
-              color: risk.color.withOpacity(0.08),
+              color: risk.color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -554,7 +539,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 22),
+              Icon(Icons.error_outline_rounded,
+                  color: Colors.red.shade700, size: 22),
               const SizedBox(width: 8),
               Text(
                 'Prediction Error',
@@ -569,7 +555,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
           const SizedBox(height: 10),
           Text(
             _errorMessage ?? 'An unknown error occurred.',
-            style: TextStyle(fontSize: 13.5, color: Colors.grey.shade800, height: 1.4),
+            style: TextStyle(
+                fontSize: 13.5, color: Colors.grey.shade800, height: 1.4),
           ),
         ],
       ),
@@ -604,9 +591,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Static info cards
-  // ---------------------------------------------------------------------
   Widget _buildMethodologyCard() {
     return _Card(
       child: Row(
@@ -620,10 +604,12 @@ class _PredictionScreenState extends State<PredictionScreen> {
                   children: [
                     const Text(
                       'Predictive Methodology',
-                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                          fontSize: 15.5, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 6),
-                    Icon(Icons.info_outline, size: 15, color: Colors.grey.shade500),
+                    Icon(Icons.info_outline,
+                        size: 15, color: Colors.grey.shade500),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -632,7 +618,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
                   'World Governance Indicators (WGI) data, using Voice & '
                   'Accountability, Political Stability, Government Effectiveness, '
                   'Regulatory Quality, and Rule of Law as predictors.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
+                  style: TextStyle(
+                      fontSize: 13, color: Colors.grey.shade700, height: 1.4),
                 ),
               ],
             ),
@@ -661,10 +648,11 @@ class _PredictionScreenState extends State<PredictionScreen> {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(9),
             ),
-            child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            child: const Icon(Icons.check_circle_rounded,
+                color: Colors.white, size: 20),
           ),
           const SizedBox(height: 14),
           const Text(
@@ -679,17 +667,16 @@ class _PredictionScreenState extends State<PredictionScreen> {
           Text(
             'Modeled on World Bank Worldwide Governance Indicators, aligned with '
             'international anti-corruption benchmarking standards.',
-            style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.9), height: 1.4),
+            style: TextStyle(
+                fontSize: 12.5,
+                color: Colors.white.withValues(alpha: 0.9),
+                height: 1.4),
           ),
         ],
       ),
     );
   }
 }
-
-// ===========================================================================
-// Small supporting types & widgets
-// ===========================================================================
 
 class _FieldSpec {
   final String key;
@@ -714,7 +701,6 @@ class _RiskInfo {
   _RiskInfo(this.description, this.color, this.icon);
 }
 
-/// A plain white rounded card matching the mockup's card style.
 class _Card extends StatelessWidget {
   final Widget child;
   final Color? border;
@@ -731,7 +717,7 @@ class _Card extends StatelessWidget {
         border: Border.all(color: border ?? const Color(0xFFF0DEDC)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -742,8 +728,6 @@ class _Card extends StatelessWidget {
   }
 }
 
-/// A rounded-rectangle box with a dashed border, used for the "Ready for
-/// Analysis" idle placeholder — mirrors the dashed panel in the mockup.
 class _DashedBorderBox extends StatelessWidget {
   final Widget child;
   final Color color;

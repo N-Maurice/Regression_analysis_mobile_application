@@ -5,7 +5,6 @@ void main() {
   runApp(const CorruptionRiskApp());
 }
 
-/// Root widget for the Corruption Risk Prediction app.
 class CorruptionRiskApp extends StatelessWidget {
   const CorruptionRiskApp({super.key});
 

@@ -1,0 +1,14 @@
+[project]
+name = "wgi-corruption-api"
+version = "0.1.0"
+description = "FastAPI service that predicts the WGI Control of Corruption estimate and retrains the model on new data."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.140.0",
+    "joblib>=1.5.3",
+    "pandas>=3.0.5",
+    "pydantic>=2",
+    "python-multipart>=0.0.32",
+    "scikit-learn==1.7.2",
+    "uvicorn[standard]>=0.51.0",
+]

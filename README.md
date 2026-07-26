@@ -280,4 +280,4 @@ GitHub: N.Maurice
 - Notebook: `summative/linear_regression/wgi_corruption_regression_analysis.ipynb`
 - Mobile app: `summative/FlutterApp/`
 - Backend API: `summative/api/`
-- Video demo: 
+- Video demo:  `https://drive.google.com/drive/folders/1CHOJ7lXd9R6IlmvZBJ1PbnOLIhzTDE3W?usp=drive_link`
